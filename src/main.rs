@@ -3,7 +3,8 @@ use rand::Rng;
 use regex::Regex;
 
 fn main() {
-    let dice_re = Regex::new(r"(\d*)d(\d+)\s*([\+-]?)\s*(\d*)").unwrap();
+    let dice_re_1 = Regex::new(r"(\d*)d(\d+)\s*([\+-]?)\s*(\d*)").unwrap();
+    let dice_re_d20 = Regex::new(r"([+-]?)\s*(\d+)").unwrap();
     let mut input_buffer = String::new();
     let mut rng = rand::thread_rng();
     
@@ -18,21 +19,31 @@ fn main() {
 
         let mut result = 0;
 
-        let (nd, ns, pm, w): (_, _, _, _);
-        if let Some(val) = dice_re.captures(&input_buffer) {
-            (_, [nd, ns, pm, w]) = val.extract();
+        let (nd, ns, pm, w): (u8, u8, &str, u8);
+        if let Some(val) = dice_re_1.captures(&input_buffer) {
+            let (_, [nds, nss, pms, ws]) = val.extract();
+
+            (nd, ns, pm, w) = (nds.parse::<u8>().unwrap(),
+                nss.parse::<u8>().unwrap(),
+                pms,
+                ws.parse::<u8>().unwrap());
+        } else if let Some(val) = dice_re_d20.captures(&input_buffer) {
+            let (_, [pms, ws]) = val.extract();
+
+            (nd, ns, pm, w) = (1, 20, pms, ws.parse::<u8>().unwrap());
         } else {
             println!("");
             continue;
         }
 
-        let (nd, ns, w) = (nd.parse::<u32>().unwrap_or(1),
-                           ns.parse::<u32>().unwrap(),
-                           w.parse::<u32>().unwrap_or(0));
-
+        print!("Rolls: ");
         for _ in 0..nd {
-            result += rng.gen_range(1..=ns);
+            let roll = rng.gen_range(1..=ns);
+            result += roll;
+            print!("{roll} ");
         }
+        print!("\n");
+        io::stdout().flush().unwrap();
 
         match pm {
             "+" => result += w,
@@ -41,6 +52,7 @@ fn main() {
         }
 
         input_buffer.clear();
-        println!("{result}");
+        println!("Result: {result}");
+        println!("");
     }
 }
