@@ -20,19 +20,21 @@ fn main() {
         let mut result = 0;
 
         let (nd, ns, pm, w): (u8, u8, &str, u8);
-        if let Some(val) = dice_re_1.captures(&input_buffer) {
+        if input_buffer == "\n" {
+            (nd, ns, pm, w) = (1u8, 20u8, "", 0u8);
+        } else if let Some(val) = dice_re_1.captures(&input_buffer) {
             let (_, [nds, nss, pms, ws]) = val.extract();
 
-            (nd, ns, pm, w) = (nds.parse::<u8>().unwrap(),
-                nss.parse::<u8>().unwrap(),
+            (nd, ns, pm, w) = (nds.parse::<u8>().unwrap_or(1u8),
+                nss.parse::<u8>().unwrap_or(20u8),
                 pms,
-                ws.parse::<u8>().unwrap());
+                ws.parse::<u8>().unwrap_or(0u8));
         } else if let Some(val) = dice_re_d20.captures(&input_buffer) {
             let (_, [pms, ws]) = val.extract();
 
             (nd, ns, pm, w) = (1, 20, pms, ws.parse::<u8>().unwrap());
         } else {
-            println!("");
+            println!();
             continue;
         }
 
@@ -42,8 +44,7 @@ fn main() {
             result += roll;
             print!("{roll} ");
         }
-        print!("\n");
-        io::stdout().flush().unwrap();
+        println!();
 
         match pm {
             "+" => result += w,
@@ -53,6 +54,6 @@ fn main() {
 
         input_buffer.clear();
         println!("Result: {result}");
-        println!("");
+        println!();
     }
 }
