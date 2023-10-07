@@ -9,3 +9,5 @@ edition = "2021"
 rand = "0.8.5"
 regex = "1.9.3"
 rustyline = "12.0.0"
+
+[target.x86_64-pc-windows-gnu]
