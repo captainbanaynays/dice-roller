@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::cmp::{min, max};
 use rand::Rng;
 use regex::Regex;
 
@@ -7,7 +8,7 @@ fn main() {
         )").unwrap();
     let dice_re_d20 = Regex::new(r"([+-]?)\s*(\d*)\s*-*([daDA]?)").unwrap();
     let mut input_buffer = String::new();
-
+        
     loop {
         print!("Roll: ");
         io::stdout().flush().unwrap();
@@ -15,8 +16,6 @@ fn main() {
         if io::stdin().read_line(&mut input_buffer).unwrap() == 0 {
             break;
         }
-
-        let mut result = 0;
 
         let (nd, ns, pm, w, ad): (u8, u8, &str, u8, &str);
         if input_buffer == "\n" || input_buffer == "\r\n" {
@@ -41,36 +40,52 @@ fn main() {
         }
 
         // Advantage and disadvantage handling
-        if ad.to_lowercase() == "a" {
-            print!("Roll 1: ");
+        match ad.to_lowercase().as_str() {
+            "a" => {
+                print!("Roll 1: ");
+                let roll_1 = roll_dice(nd, ns, pm, w);
+                println!();
+                print!("Roll 2: ");
+                let roll_2 = roll_dice(nd, ns, pm, w);
+                println!();
+                let result = max(roll_1, roll_2);
+                println!("Result: {result}");
+                println!();
+            },
+            "d" => {
+                print!("Roll 1: ");
+                let roll_1 = roll_dice(nd, ns, pm, w);
+                println!();
+                print!("Roll 2: ");
+                let roll_2 = roll_dice(nd, ns, pm, w);
+                println!();
+                let result = min(roll_1, roll_2);
+                println!("Result: {result}");
+                println!();
+            },
+            _ => {
+                print!("Roll: ");
+                let result = roll_dice(nd, ns, pm, w);
+                println!();
+                println!("Result: {result}");
+                println!();
+            },
         }
-        print!("Rolls: ");
-        for _ in 0..nd {
-            let roll = rng.gen_range(1..=ns);
-            result += roll;
-            print!("{roll} ");
-        }
-        println!();
-
-        match pm {
-            "+" => result += w,
-            "-" => result -= w,
-            _ => (),
-        }
-
-        input_buffer.clear();
-        println!("Result: {result}");
-        println!();
     }
 }
 
-fn roll_dice(nd:u8, ns:u8) -> u8 {
+fn roll_dice(nd:u8, ns:u8, pm:&str, w:u8) -> u8 {
     let mut rng = rand::thread_rng();
     let mut result = 0;
     for _ in 0..nd {
         let roll = rng.gen_range(1..=ns);
         result += roll;
         print!("{roll} ");
+    }
+    match pm {
+        "+" => result += w,
+        "-" => result -= w,
+        _ => (),
     }
     result
 }
