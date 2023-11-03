@@ -62,7 +62,7 @@ fn main() {
                     }
                     "c" => {
                         print!("Roll: ");
-                        let result = roll_dice(nd * 2, ns, pm, w * 2);
+                        let result = roll_dice(nd * 2, ns, pm, w);
                         println!();
                         println!("Result: {result}");
                         println!();

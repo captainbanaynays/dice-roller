@@ -1,10 +1,11 @@
 # Dice Roller
 
-Simple program that rolls dice for TTRPGs. Uses XdY[+-]Z[-dDaA] format,
+Simple program that rolls dice for TTRPGs. Uses XdY[+-]Z[-dac] format,
 where:
 
 - X: number of dice
 - Y: number of sides
 - Z: weight to be added/subtracted
-- d/D: roll with disadvantage
-- a/A: roll with advantage
+- d: roll with disadvantage
+- a: roll with advantage
+- c: critical damage roll (double dice)
