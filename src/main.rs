@@ -85,19 +85,59 @@ enum Token {
     RightParen,
 }
 
+fn tokenize(a: String) -> Result<Vec<Token>, &'static str> {
+    let a = a.trim();
+    let a = a.replace(" ", "");
+    let ret: Vec<Token> = Vec::new();
+    let mut splitter: Vec<String> = Vec::new();
+    splitter.push(a.to_string());
+    while let Some(i) = splitter[splitter.len() - 1]
+        .find(|c| c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')')
+    {
+        let mut s1 = splitter.pop().unwrap();
+        let mut s2 = s1.split_off(i);
+        splitter.push(s1);
+        if s2.bytes().len() > 2 {
+            return Err("tokenize error: trailing operator");
+        }
+        let s3 = s2.split_off(1);
+        splitter.push(s2);
+        splitter.push(s3);
+    }
+    for sub in splitter {
+        ret.push(match_sub(sub));
+    }
+    unimplemented!();
+}
+
+fn match_sub(a: String) -> Option(Token) {
+    match a.as_str() {
+        "+" => Some(Token::Add),
+        "-" => Some(Token::Subtract),
+        "*" => Some(Token::Multiply),
+        "/" => Some(Token::Divide),
+        "(" => Some(Token::LeftParen),
+        ")" => Some(Token::RightParen),
+        _ => {
+            if let Some(d) = Dice::from_string(a) {
+                Some(Token::Dice(d))
+            } else if let Some(n: u32) = a.parse() {
+                //TODO: Finish parsing!
+            }
+        }
+    }
+}
+
 fn main() {
     let mut rl = DefaultEditor::new().unwrap();
 
     loop {
         let readline = rl.readline(" 🎲 ");
-        //TODO: Implement string parsing into a tokenized string -- include special case for
-        //(Add/Subtract Constant) to be a d20 and that. Additionally an empty input should be a
-        //d20.
-        //TODO: ensure order of operations is correctly followed, including parentheses
-        //TODO: then finish collapsing the input into a final value
 
         match readline {
-            Ok(line) => {}
+            Ok(line) => {
+                let token_string = tokenize(line);
+            }
             Err(ReadlineError::Interrupted) => {
                 println!("Interrupt signal received.");
                 break;
