@@ -12,6 +12,17 @@ enum Variant {
     None,
 }
 
+enum Token {
+    Dice(Dice),
+    Constant(i32),
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    LeftParen,
+    RightParen,
+}
+
 struct Dice {
     num_dice: u8,
     die_value: u8,
@@ -43,46 +54,35 @@ impl Dice {
         None
     }
 
-    fn roll(a: Dice) -> i32 {
+    fn roll(&self) -> Token {
         let mut rng = rand::thread_rng();
         let mut roll1 = 0;
         print!("Roll 1: ");
-        for _ in 0..a.num_dice {
-            let roll: u32 = (rng.gen::<u32>() % u32::from(a.die_value)) + 1;
+        for _ in 0..self.num_dice {
+            let roll = (rng.gen::<i32>() % i32::from(self.die_value)) + 1;
             print!("{roll }");
             roll1 += roll;
         }
         println!("");
-        if a.variant == Variant::None {
-            return roll1;
+        if self.variant == Variant::None {
+            return Token::Constant(roll1);
         }
         let mut roll2 = 0;
         println!("Roll 2: ");
 
-        for _ in 0..a.num_dice {
-            let roll = (rng.gen::<i32>() % i32::from(a.die_value)) + 1;
+        for _ in 0..self.num_dice {
+            let roll = (rng.gen::<i32>() % i32::from(self.die_value)) + 1;
             print!("{roll }");
             roll2 += roll;
         }
         println!("");
-        match a.variant {
-            Variant::Crit => roll1 + roll2,
-            Variant::Advantage => max(roll1, roll2),
-            Variant::Disadvantage => min(roll1, roll2),
+        match self.variant {
+            Variant::Crit => Token::Constant(roll1 + roll2),
+            Variant::Advantage => Token::Constant(max(roll1, roll2)),
+            Variant::Disadvantage => Token::Constant(min(roll1, roll2)),
             _ => panic!(),
         }
     }
-}
-
-enum Token {
-    Dice(Dice),
-    Constant(u32),
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    LeftParen,
-    RightParen,
 }
 
 fn tokenize(a: String) -> Result<Vec<Token>, &'static str> {
@@ -125,7 +125,7 @@ fn match_sub(a: String) -> Option<Token> {
         _ => {
             if let Some(d) = Dice::from_string(a.as_str()) {
                 Some(Token::Dice(d))
-            } else if let Ok(n) = a.parse::<u32>() {
+            } else if let Ok(n) = a.parse::<i32>() {
                 Some(Token::Constant(n))
             } else {
                 None
@@ -134,22 +134,75 @@ fn match_sub(a: String) -> Option<Token> {
     }
 }
 
-struct Expression {
-    phrase: Vec<Token>,
-    priority: u32,
+fn roll_expr(a: Vec<Token>) -> Vec<Token> {
+    // Roll all dice
+    for mut token in &a {
+        match token {
+            Token::Dice(d) => {
+                token = &d.roll();
+            }
+            _ => {}
+        };
+    }
+    a
 }
 
-impl Expression {
-    fn new() -> Expression {
-        let phrase: Vec<Token> = Vec::new();
-        { phrase, priority: u32 }
+fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
+    // Remove external parens
+    if matches!(a[0], Token::LeftParen) && matches!(a[a.len() - 1], Token::RightParen) {
+        let mut counter = 1;
+        for i in 1..a.len() {
+            match a[i] {
+                Token::LeftParen => counter += 1,
+                Token::RightParen => counter -= 1,
+                _ => {}
+            };
+        }
+        if counter != 0 {
+            return Err("parens parsing error");
+        }
+        a.pop();
+        a.remove(0);
     }
-}
+    // Check to see if there is an internal parentheses, recursively call
+    'a: loop {
+        let mut lindex = usize::max_value();
+        'b: for (i, token) in (0..a.len()).zip(a.iter()) {
+            if matches!(token, Token::LeftParen) {
+                lindex = i;
+                break 'b;
+            }
+        }
+        if lindex == usize::max_value() {
+            break 'a;
+        }
 
-impl Expression {
-    fn evaluate(a: Expression) -> Expression {
-        let mut ret = Expression::new();
+        let mut counter = 1;
+        let mut i = 1;
+        while counter != 0 {
+            match a[lindex + i] {
+                Token::LeftParen => counter += 1,
+                Token::RightParen => counter -= 1,
+                _ => {}
+            }
+            i += 1;
+        }
+        let rindex = lindex + i - 1;
+        let mut rec: Vec<Token> = Vec::new();
+        for _ in lindex..=rindex {
+            rec.push(a.remove(lindex));
+        }
+        rec = evaluate(rec).unwrap();
+        for item in rec.into_iter().rev() {
+            a.insert(lindex, item);
+        }
     }
+    // TODO
+    // If multiplication
+    // If division
+    // If addition
+    // If subtraction
+    todo!()
 }
 
 fn main() {
