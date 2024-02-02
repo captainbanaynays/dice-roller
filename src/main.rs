@@ -1,10 +1,12 @@
+use core::panic;
 use rand::Rng;
 use regex::Regex;
 use rustyline::{error::ReadlineError, DefaultEditor};
 use std::cmp::{max, min};
+use std::fmt::Display;
 use std::str;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum Variant {
     Crit,
     Advantage,
@@ -12,6 +14,7 @@ enum Variant {
     None,
 }
 
+#[derive(Debug, Clone)]
 enum Token {
     Dice(Dice),
     Constant(i32),
@@ -23,9 +26,31 @@ enum Token {
     RightParen,
 }
 
+impl Display for Variant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Variant::None => write!(f, "{}", ""),
+            Variant::Crit => write!(f, "{}", "c"),
+            Variant::Advantage => write!(f, "{}", "a"),
+            Variant::Disadvantage => write!(f, "{}", "d"),
+        }
+    }
+}
+
+impl Token {
+    fn constant(self) -> i32 {
+        if let Token::Constant(c) = self {
+            c
+        } else {
+            panic!("Passed value not a constant.")
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 struct Dice {
-    num_dice: u8,
-    die_value: u8,
+    num_dice: i32,
+    die_value: i32,
     variant: Variant,
 }
 
@@ -34,8 +59,8 @@ impl Dice {
         let dice_re = Regex::new(r"(\d*)d(\d+)([cad]?)").unwrap();
         if let Some(cap) = dice_re.captures(a) {
             let (_, [nd, dv, v]) = cap.extract();
-            let nd = nd.parse::<u8>().unwrap_or_else(|_| 1u8);
-            let dv = dv.parse::<u8>().unwrap();
+            let nd = nd.parse::<i32>().unwrap_or_else(|_| 1);
+            let dv = dv.parse::<i32>().unwrap();
 
             let v = match v {
                 "a" => Variant::Advantage,
@@ -57,10 +82,11 @@ impl Dice {
     fn roll(&self) -> Token {
         let mut rng = rand::thread_rng();
         let mut roll1 = 0;
+        println!("{}d{}{}", self.num_dice, self.die_value, self.variant);
         print!("Roll 1: ");
         for _ in 0..self.num_dice {
-            let roll = (rng.gen::<i32>() % i32::from(self.die_value)) + 1;
-            print!("{roll }");
+            let roll = rng.gen_range(1..=self.die_value);
+            print!("{roll} ");
             roll1 += roll;
         }
         println!("");
@@ -72,7 +98,7 @@ impl Dice {
 
         for _ in 0..self.num_dice {
             let roll = (rng.gen::<i32>() % i32::from(self.die_value)) + 1;
-            print!("{roll }");
+            print!("{roll} ");
             roll2 += roll;
         }
         println!("");
@@ -80,12 +106,16 @@ impl Dice {
             Variant::Crit => Token::Constant(roll1 + roll2),
             Variant::Advantage => Token::Constant(max(roll1, roll2)),
             Variant::Disadvantage => Token::Constant(min(roll1, roll2)),
-            _ => panic!(),
+            _ => panic!("Passed variant is None, expecting a non-None value"),
         }
     }
 }
 
-fn tokenize(a: String) -> Result<Vec<Token>, &'static str> {
+fn tokenize(mut a: String) -> Result<Vec<Token>, &'static str> {
+    // Special case for empty
+    if a.is_empty() {
+        a = "d20".to_string();
+    }
     let a = a.trim();
     let a = a.replace(" ", "");
     let mut ret: Vec<Token> = Vec::new();
@@ -97,12 +127,12 @@ fn tokenize(a: String) -> Result<Vec<Token>, &'static str> {
         let mut s1 = splitter.pop().unwrap();
         let mut s2 = s1.split_off(i);
         splitter.push(s1);
-        if s2.bytes().len() > 2 {
-            return Err("tokenize error: trailing operator");
-        }
         let s3 = s2.split_off(1);
         splitter.push(s2);
         splitter.push(s3);
+    }
+    if splitter[0].is_empty() {
+        splitter.remove(0);
     }
     for sub in splitter {
         let new_token = match_sub(sub);
@@ -110,6 +140,17 @@ fn tokenize(a: String) -> Result<Vec<Token>, &'static str> {
             Some(t) => ret.push(t),
             None => return Err("tokenize error: incorrect format"),
         };
+    }
+    if ret.len() == 2 {
+        match ret[0] {
+            Token::Add | Token::Subtract | Token::Multiply | Token::Divide => match ret[1] {
+                Token::Constant(_) => {
+                    ret.insert(0, Token::Dice(Dice::from_string("1d20").unwrap()))
+                }
+                _ => {}
+            },
+            _ => {}
+        }
     }
     return Ok(ret);
 }
@@ -134,15 +175,20 @@ fn match_sub(a: String) -> Option<Token> {
     }
 }
 
-fn roll_expr(a: Vec<Token>) -> Vec<Token> {
-    // Roll all dice
-    for mut token in &a {
-        match token {
+fn roll_expr(mut a: Vec<Token>) -> Vec<Token> {
+    let mut i = 0;
+    loop {
+        if i >= a.len() {
+            break;
+        }
+        match a[i] {
             Token::Dice(d) => {
-                token = &d.roll();
+                a.remove(i);
+                a.insert(i, d.roll());
             }
             _ => {}
-        };
+        }
+        i += 1;
     }
     a
 }
@@ -197,12 +243,60 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
             a.insert(lindex, item);
         }
     }
-    // TODO
     // If multiplication
     // If division
+    let mut i = 0usize;
+    'a: loop {
+        if i >= a.len() {
+            break 'a;
+        }
+        let token = &a[i];
+        match token {
+            Token::Multiply => {
+                let ro = a.remove(i + 1).constant();
+                a.remove(i);
+                let lo = a.remove(i - 1).constant();
+                a.insert(i - 1, Token::Constant(lo * ro));
+            }
+            Token::Divide => {
+                let ro = a.remove(i + 1).constant();
+                a.remove(i);
+                let lo = a.remove(i - 1).constant();
+                a.insert(i - 1, Token::Constant(lo / ro));
+            }
+            _ => {}
+        }
+        i += 1;
+    }
     // If addition
     // If subtraction
-    todo!()
+    let mut i = 0usize;
+    'a: loop {
+        if i >= a.len() {
+            break 'a;
+        }
+        let token = &a[i];
+        match token {
+            Token::Add => {
+                let ro = a.remove(i + 1).constant();
+                a.remove(i);
+                let lo = a.remove(i - 1).constant();
+                a.insert(i - 1, Token::Constant(lo + ro));
+            }
+            Token::Subtract => {
+                let ro = a.remove(i + 1).constant();
+                a.remove(i);
+                let lo = a.remove(i - 1).constant();
+                a.insert(i - 1, Token::Constant(lo - ro));
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    if a.len() != 1 {
+        return Err("Expression did not simplify");
+    }
+    Ok(a)
 }
 
 fn main() {
@@ -213,7 +307,26 @@ fn main() {
 
         match readline {
             Ok(line) => {
-                let token_string = tokenize(line);
+                let tokenized = match tokenize(line) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        println!("{e}");
+                        println!("");
+                        continue;
+                    }
+                };
+                let rolled = roll_expr(tokenized);
+                let mut result = match evaluate(rolled) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        println!("{e}");
+                        println!("");
+                        continue;
+                    }
+                };
+                let roll = result.remove(0).constant();
+                println!("Result: {roll}");
+                println!("");
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Interrupt signal received.");
