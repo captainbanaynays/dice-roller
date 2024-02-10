@@ -1,3 +1,4 @@
+use colored::Colorize;
 use core::panic;
 use rand::Rng;
 use regex::Regex;
@@ -82,8 +83,9 @@ impl Dice {
     fn roll(&self) -> Token {
         let mut rng = rand::thread_rng();
         let mut roll1 = 0;
-        println!("{}d{}{}", self.num_dice, self.die_value, self.variant);
-        print!("Roll 1: ");
+        let dstring = format!("{}d{}{}", self.num_dice, self.die_value, self.variant);
+        println!("{}----------------", dstring.bold());
+        print!("Roll: ");
         for _ in 0..self.num_dice {
             let roll = rng.gen_range(1..=self.die_value);
             print!("{roll} ");
@@ -125,14 +127,27 @@ fn tokenize(mut a: String) -> Result<Vec<Token>, &'static str> {
         .find(|c| c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')')
     {
         let mut s1 = splitter.pop().unwrap();
-        let mut s2 = s1.split_off(i);
-        splitter.push(s1);
-        let s3 = s2.split_off(1);
-        splitter.push(s2);
-        splitter.push(s3);
+        if i == 0 {
+            let s2 = s1.split_off(1);
+            splitter.push(s1);
+            splitter.push(s2);
+        // Do not subtract 1 here because the first string is already removed
+        // from splitter
+        } else if i == splitter.len() {
+            let s2 = s1.split_off(i);
+            splitter.push(s1);
+            splitter.push(s2);
+        } else {
+            let mut s2 = s1.split_off(i);
+            let s3 = s2.split_off(1);
+            splitter.push(s1);
+            splitter.push(s2);
+            splitter.push(s3);
+        }
     }
-    if splitter[0].is_empty() {
-        splitter.remove(0);
+    let last = splitter.pop().unwrap();
+    if !last.is_empty() {
+        splitter.push(last);
     }
     for sub in splitter {
         let new_token = match_sub(sub);
@@ -194,22 +209,6 @@ fn roll_expr(mut a: Vec<Token>) -> Vec<Token> {
 }
 
 fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
-    // Remove external parens
-    if matches!(a[0], Token::LeftParen) && matches!(a[a.len() - 1], Token::RightParen) {
-        let mut counter = 1;
-        for i in 1..a.len() {
-            match a[i] {
-                Token::LeftParen => counter += 1,
-                Token::RightParen => counter -= 1,
-                _ => {}
-            };
-        }
-        if counter != 0 {
-            return Err("parens parsing error");
-        }
-        a.pop();
-        a.remove(0);
-    }
     // Check to see if there is an internal parentheses, recursively call
     'a: loop {
         let mut lindex = usize::max_value();
@@ -238,6 +237,8 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
         for _ in lindex..=rindex {
             rec.push(a.remove(lindex));
         }
+        rec.pop();
+        rec.remove(0);
         rec = evaluate(rec).unwrap();
         for item in rec.into_iter().rev() {
             a.insert(lindex, item);
@@ -325,6 +326,7 @@ fn main() {
                     }
                 };
                 let roll = result.remove(0).constant();
+                println!("--------------------");
                 println!("Result: {roll}");
                 println!("");
             }
