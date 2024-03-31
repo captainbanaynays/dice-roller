@@ -99,7 +99,7 @@ impl Dice {
         println!("Roll 2: ");
 
         for _ in 0..self.num_dice {
-            let roll = (rng.gen::<i32>() % i32::from(self.die_value)) + 1;
+            let roll = rng.gen_range(1..=self.die_value);
             print!("{roll} ");
             roll2 += roll;
         }
