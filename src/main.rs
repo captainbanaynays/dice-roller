@@ -91,19 +91,19 @@ impl Dice {
             print!("{roll} ");
             roll1 += roll;
         }
-        println!("");
+        println!();
         if self.variant == Variant::None {
             return Token::Constant(roll1);
         }
         let mut roll2 = 0;
-        println!("Roll 2: ");
+        print!("Roll 2: ");
 
         for _ in 0..self.num_dice {
             let roll = rng.gen_range(1..=self.die_value);
             print!("{roll} ");
             roll2 += roll;
         }
-        println!("");
+        println!();
         match self.variant {
             Variant::Crit => Token::Constant(roll1 + roll2),
             Variant::Advantage => Token::Constant(max(roll1, roll2)),
