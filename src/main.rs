@@ -247,9 +247,15 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
     // If multiplication
     // If division
     let mut i = 0usize;
+    let mut modified: bool = false;
     'a: loop {
         if i >= a.len() {
-            break 'a;
+            if modified {
+                modified = false;
+                i = 0;
+            } else {
+                break 'a;
+            }
         }
         let token = &a[i];
         match token {
@@ -258,12 +264,14 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
                 a.remove(i);
                 let lo = a.remove(i - 1).constant();
                 a.insert(i - 1, Token::Constant(lo * ro));
+                modified = true;
             }
             Token::Divide => {
                 let ro = a.remove(i + 1).constant();
                 a.remove(i);
                 let lo = a.remove(i - 1).constant();
                 a.insert(i - 1, Token::Constant(lo / ro));
+                modified = true;
             }
             _ => {}
         }
@@ -272,9 +280,18 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
     // If addition
     // If subtraction
     let mut i = 0usize;
+    let mut modified: bool = false;
     'a: loop {
-        if i >= a.len() {
+        if a.len() == 1 {
             break 'a;
+        }
+        if i >= a.len() {
+            if modified {
+                modified = false;
+            } else {
+                return Err("Expression did not simplify");
+            }
+            i = 0;
         }
         let token = &a[i];
         match token {
@@ -283,20 +300,20 @@ fn evaluate(mut a: Vec<Token>) -> Result<Vec<Token>, &'static str> {
                 a.remove(i);
                 let lo = a.remove(i - 1).constant();
                 a.insert(i - 1, Token::Constant(lo + ro));
+                modified = true;
             }
             Token::Subtract => {
                 let ro = a.remove(i + 1).constant();
                 a.remove(i);
                 let lo = a.remove(i - 1).constant();
                 a.insert(i - 1, Token::Constant(lo - ro));
+                modified = true;
             }
             _ => {}
         }
         i += 1;
     }
-    if a.len() != 1 {
-        return Err("Expression did not simplify");
-    }
+    if a.len() != 1 {}
     Ok(a)
 }
 
